@@ -88,6 +88,13 @@ public class CalculatorService {
     }
 
     /**
+     * Format the result of a calculation
+     */
+    private String formatResult(double a, String operator, double b, double result) {
+        return String.format("%.2f %s %.2f = %.2f", a, operator, b, result);
+    }
+
+    /**
      * Calculate the modulus (remainder) of division
      * @param a The dividend
      * @param b The divisor
@@ -130,12 +137,5 @@ public class CalculatorService {
                 "7. modulus(a, b) - Calculates the remainder of division\n" +
                 "8. absolute(number) - Calculates the absolute value\n\n" +
                 "Example usage: add(5, 3) will return 5 + 3 = 8";
-    }
-
-    /**
-     * Format the result of a calculation
-     */
-    private String formatResult(double a, String operator, double b, double result) {
-        return String.format("%.2f %s %.2f = %.2f", a, operator, b, result);
     }
 }
