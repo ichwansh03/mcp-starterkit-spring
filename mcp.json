@@ -1,0 +1,10 @@
+{
+  "inputs": [],
+  "servers": {
+    "calculator-mcp": {
+      "command": "java",
+      "args": ["-jar", "target/calculator-server-0.0.1-SNAPSHOT.jar"]
+    }
+  }
+}
+//for run, open Settings -> Tools -> MCP
