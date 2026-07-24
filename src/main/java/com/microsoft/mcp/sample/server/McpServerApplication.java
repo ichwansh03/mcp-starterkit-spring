@@ -7,6 +7,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
+//run the server
+//run this command to use mcp inspector `npx @modelcontextprotocol/inspector`
 @SpringBootApplication
 public class McpServerApplication {
 
