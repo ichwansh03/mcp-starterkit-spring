@@ -1,0 +1,10 @@
+{
+  "name": "mcp-server-template-inspector",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Convenience scripts for testing the MCP Server Template with the MCP Inspector. Not a Node/JS application — no runtime dependencies of its own.",
+  "scripts": {
+    "inspector": "npx @modelcontextprotocol/inspector --config mcp-inspector.config.json --server mcp-server-template",
+    "inspector:ui": "npx @modelcontextprotocol/inspector"
+  }
+}

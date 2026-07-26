@@ -1,0 +1,9 @@
+{
+  "inputs": [],
+  "servers": {
+    "mcp-server-template": {
+      "command": "java",
+      "args": ["-jar", "target/mcp-server-template-0.1.0-SNAPSHOT.jar"]
+    }
+  }
+}
