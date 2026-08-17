@@ -3,12 +3,7 @@
   "mcp": {
     "weather": {
       "type": "local",
-      "command": [
-        "java",
-        "-jar",
-        "target/weather-mcp-0.0.1.jar",
-        "--spring.main.web-application-type=none"
-      ],
+      "command": ["java", "-jar", "target/weather-mcp-0.0.1.jar"],
       "enabled": true
     }
   }
