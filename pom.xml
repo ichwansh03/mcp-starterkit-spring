@@ -42,13 +42,6 @@
             <version>2.0.0</version>
         </dependency>
 
-        <!-- Logging ke stderr (WAJIB, bukan System.out, karena stdout dipakai JSON-RPC) -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>2.0.16</version>
-        </dependency>
-
         <!-- Parsing JSON dari response Open-Meteo -->
         <dependency>
             <groupId>org.json</groupId>
