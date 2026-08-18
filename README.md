@@ -5,8 +5,8 @@ Spring Boot **MCP server** exposing weather data as an MCP tool. LLM clients (Op
 ```
 ┌─────────────────┐   MCP (JSON-RPC / stdio)   ┌────────────────────┐   REST   ┌───────────┐
 │  LLM client     │ ─────────────────────────▶ │  weather-mcp (jar) │ ───────▶ │ Open-Meteo│
-│  (opencode,     │ ◀───────────────────────── │  get_current_weather│ ◀─────── │           │
-│  Inspector)     │        tool result          └────────────────────┘          └───────────┘
+│  (opencode,     │ ◀───────────────────────── │ get_current_weather│ ◀─────── │           │
+│  Inspector)     │        tool result         └────────────────────┘          └───────────┘
 └─────────────────┘
 ```
 
