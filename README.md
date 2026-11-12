@@ -1,139 +1,156 @@
-# MCP Server Template
+# Google ADK Java Agents
 
-A general-purpose starting point for building an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/)
-server with **Spring Boot + Spring AI**. Unlike a single-purpose demo, this template is intentionally
-domain-agnostic — the sample tools it ships with (echo, current time, UUID generator, text counter) exist
-only to show the wiring. Swap them out for whatever your project actually needs.
+A small collection of [Google ADK](https://github.com/google/adk-java) agents written in Java 21.
+The project demonstrates four building blocks: a minimal function-calling agent, a multi-tool agent
+with structured JSON output, a built-in code-execution agent, and a plain CLI runner.
+
+All agents use Gemini models through the Google AI Studio API key.
+
+## Requirements
+
+- Java 21+
+- Maven 3.9+
+- A Gemini API key (`GEMINI_API_KEY` or `GOOGLE_API_KEY`)
+
+## Configuration
+
+Create a `.env` file in the project root:
+
+```bash
+export GEMINI_API_KEY="your-api-key"
+```
+
+`.env` is git-ignored. The key is read by the Google Gen AI SDK from the process environment, so it
+must be exported **before** the JVM starts. Sourcing `.env` inside a script (as `run.sh` does) is
+enough because `exec:java` runs in the same JVM as Maven.
+
+## Build
+
+```bash
+mvn -q -DskipTests compile
+```
+
+## Agents
+
+### `HelloTimeAgent` — `hello-time-agent`
+
+A minimal `LlmAgent` that exposes one `FunctionTool`, `getCurrentTime`.
+
+- **Tools:** `getCurrentTime(city)`
+- **Behavior:** returns a fixed, mocked answer (`The time is 10:30am.`). The `city` argument is
+  accepted by the tool signature but is not used by the implementation.
+- **Purpose:** smallest possible example of tool declaration, `@Schema` parameter annotations, and
+  running an agent through `InMemoryRunner`.
+- **Entry point:** `AgentCliRunner` (see below).
+
+### `MultiToolAgent` — `multi_tool_agent`
+
+A two-tool agent that answers time and weather questions.
+
+- **Tools:**
+  - `getCurrentTime(city)` — normalizes the city name and looks up a matching `ZoneId`, returning
+    the current local time.
+  - `getWeather(city)` — mocked weather lookup (only `Jakarta` returns a success result).
+- **Structured output:** the agent declares an `outputSchema` (`status`, `report`, both required)
+  and an `outputKey("multi_tool_result")`.
+  - The schema becomes `responseSchema` + `responseMimeType="application/json"` on the Gemini
+    request.
+  - The validated result is written to session state under `multi_tool_result`; invalid JSON is
+    stored as a raw string with a warning.
+  - With Gemini 3 models the schema is applied natively and can be combined with tools. With
+    Gemini 2.x, ADK instead injects a synthetic `set_model_response` tool, which is why mixing
+    tools and structured output is discouraged on those models.
+- **Entry point:** available in the dev UI and in its own `main` CLI.
+
+### `CodeExecutionAgentApp` — `calculator_agent`
+
+An agent that uses Gemini's built-in Python code execution tool.
+
+- **Tools:** `BuiltInCodeExecutionTool`
+- **Model:** `gemini-3-flash-preview`
+- **Behavior:** writes and executes Python to evaluate expressions, then returns the numeric result
+  as plain text. For example, `(5 + 7) * 3` produces `36` and `10!` produces `3628800`.
+- **Dev UI:** exposes `public static final BaseAgent ROOT_AGENT`, so the ADK web server discovers it
+  automatically.
+- **Entry point:** its own `main` runs two sample queries through `Runner`; the same agent is also
+  served by the dev UI.
+
+### `AgentCliRunner`
+
+A command-line harness for `HelloTimeAgent` built on `InMemoryRunner`: creates a session, reads user input from stdin, streams events, and prints the final response. Type `quit`
+to exit.
+
+It is a runner, not an agent: it contains no instructions, tools, or model configuration.
+
+## Running the agents
+
+### Dev UI (all discoverable agents)
+
+```bash
+./run.sh
+```
+
+The script sources `.env`, then starts `com.google.adk.web.AdkWebServer` with
+`--adk.agents.source-dir=target --server.port=8080`. Open <http://localhost:8080>.
+
+The loader scans compiled classes for a `public static final BaseAgent ROOT_AGENT` field, so the
+available apps are `hello-time-agent`, `multi_tool_agent`, and `calculator_agent`.
+
+Notes:
+
+- `run.sh` is blocking. Do not start it twice; the second start fails with
+  `Port 8080 was already in use`.
+- Recompile and restart after changing an agent; the loader reads `target/classes` at startup.
+- Stop with `Ctrl-C`, or `kill` the PID shown by
+  `lsof -nP -iTCP:8080 -sTCP:LISTEN`.
+
+### CLI: hello-time agent
+
+```bash
+set -a; . ./.env; set +a
+mvn -q compile exec:java -Dexec.mainClass=AgentCliRunner
+```
+
+### CLI: multi-tool agent
+
+```bash
+set -a; . ./.env; set +a
+mvn -q compile exec:java -Dexec.mainClass=multitool.MultiToolAgent
+```
+
+### CLI: code-execution agent
+
+```bash
+set -a; . ./.env; set +a
+mvn -q compile exec:java -Dexec.mainClass=CodeExecutionAgentApp
+```
 
 ## Project layout
 
 ```
-src/main/java/com/example/mcp/server/
-  McpServerApplication.java     # entry point; registers tool services
-  config/StartupConfig.java     # startup banner / usage message
-  controller/HealthController.java  # plain REST /health and /info endpoints
-  exception/GlobalExceptionHandler.java
-  service/SampleToolService.java    # EXAMPLE tools — replace with your own
-src/main/resources/
-  application.properties
-  banner.txt
-package.json               # npm scripts to launch MCP Inspector (no other JS deps)
-mcp-inspector.config.json  # points Inspector at this server's SSE endpoint
+src/main/java/
+  AgentCliRunner.java          # CLI harness for HelloTimeAgent
+  HelloTimeAgent.java          # minimal single-tool agent
+  CodeExecutionAgentApp.java   # built-in code execution agent, exposed to the dev UI
+  multitool/
+    MultiToolAgent.java        # time + weather tools, structured JSON output
+pom.xml                        # google-adk and google-adk-dev 1.12.0
+run.sh                         # loads .env and starts the ADK dev UI on port 8080
 ```
 
-## How to add your own tools
+## Models and quotas
 
-1. Create a new `@Service` class (or edit `SampleToolService`).
-2. Annotate each method you want to expose with `@Tool(description = "...")`.
-   Keep parameter types simple (String, double, boolean, int, etc.) — they
-   become the tool's JSON input schema automatically.
-3. Register the service in `McpServerApplication#mcpTools(...)` by adding it
-   as a parameter and passing it into `.toolObjects(...)`.
+The examples use `gemini-3-flash-preview`. Free-tier quota for this model is limited (for example,
+20 generate-content requests per day in some projects), and the API returns
+`429 RESOURCE_EXHAUSTED` once it is spent. Other models, such as `gemini-2.0-flash`, may be retired
+and return `404 NOT_FOUND`.
 
-```java
-@Service
-public class WeatherToolService {
-    @Tool(description = "Get the current weather for a city")
-    public String getWeather(String city) {
-        // your implementation
-    }
-}
-```
+If a request fails, check the exception in the terminal or dev UI log:
 
-```java
-@Bean
-public ToolCallbackProvider mcpTools(SampleToolService sampleToolService,
-                                      WeatherToolService weatherToolService) {
-    return MethodToolCallbackProvider.builder()
-            .toolObjects(sampleToolService, weatherToolService)
-            .build();
-}
-```
+- `429` — quota exhausted; wait for the reset or use billing/another model.
+- `404` — model retired; switch to a currently available model.
+- `Port 8080 was already in use` — another dev-server instance is still running.
 
-You can add as many tool-bearing services as you like — group them by
-domain area (e.g. `OrdersToolService`, `InventoryToolService`) rather than
-cramming everything into one class.
+## License
 
-## How to Run
-
-### Prerequisites
-
-- Java 21+
-- Maven (or use the included `./mvnw` wrapper)
-
-### Build & Run
-
-```bash
-./mvnw clean package -DskipTests
-java -jar target/mcp-server-template-0.1.0-SNAPSHOT.jar
-```
-
-Server starts at `http://localhost:8080`.
-- `GET /health` — health check
-- `GET /info` — service + tool metadata
-- MCP tools are served over the Spring AI MCP transport (WebFlux/SSE)
-
-### Docker
-
-```bash
-docker build -t mcp-server-template .
-docker run -p 8080:8080 mcp-server-template
-```
-
-### IDE Configuration
-
-`mcp.json` configures the server for MCP-aware IDEs (e.g. JetBrains: Settings → Tools → MCP).
-Update the jar filename inside it if you rename the artifact.
-
-### Testing with MCP Inspector
-
-The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is the standard tool for
-manually testing an MCP server's tools (and, once you add them, prompts/resources) from a browser
-UI — no client integration needed. It's a separate Node.js CLI, not a Java dependency, so it isn't
-bundled into the Maven build; it's launched alongside your running server.
-
-1. Start the server first:
-   ```bash
-   ./mvnw spring-boot:run
-   ```
-   By default the Spring AI WebFlux starter exposes the SSE endpoint at `http://localhost:8080/sse`
-   (and the message endpoint at `/mcp/messages`). Confirm/override these via
-   `spring.ai.mcp.server.sse-endpoint` and `spring.ai.mcp.server.sse-message-endpoint` in
-   `application.properties` if you change the transport config.
-
-2. In another terminal, launch Inspector using the included config (`mcp-inspector.config.json`)
-   via the npm script:
-   ```bash
-   npm run inspector
-   ```
-   This runs `npx @modelcontextprotocol/inspector --config mcp-inspector.config.json --server mcp-server-template`,
-   which connects straight to your running server over SSE and opens the Inspector UI in your browser.
-
-   Alternatively, launch Inspector with no config and connect manually through the UI:
-   ```bash
-   npm run inspector:ui
-   # or: npx @modelcontextprotocol/inspector
-   ```
-   Then choose transport type "SSE" and enter `http://localhost:8080/sse` as the URL.
-
-3. In the Inspector UI, open the **Tools** tab to see `echo`, `currentTime`, `generateUuid`,
-   `countText`, and `help` (or whatever you've replaced them with), inspect their generated input
-   schemas, and invoke them with test arguments to see live results.
-
-`package.json` here exists solely to hold these two convenience scripts — this project has no
-other Node/JS runtime dependency.
-
-## Customizing the project
-
-- **Rename the artifact**: update `artifactId`, `name`, and `description` in `pom.xml`,
-  and the jar filename referenced in `Dockerfile` and `mcp.json`.
-- **Change the base package**: rename `com.example.mcp.server` to match your organization,
-  updating package declarations and imports across all Java files.
-- **Startup messages**: edit `mcp.service.welcome` / `mcp.service.usage` in `application.properties`.
-- **Banner**: replace `src/main/resources/banner.txt` with your own ASCII art or delete it.
-
-## Learn more
-
-- [Spring AI MCP docs](https://docs.spring.io/spring-ai/reference/api/mcp.html) — Spring AI MCP support
-- [Model Context Protocol specification](https://modelcontextprotocol.io/) — Official docs
-- [mcp-for-beginners](https://github.com/microsoft/mcp-for-beginners) — hands-on tutorial for building MCP servers from scratch
+No license file is included in this branch.
