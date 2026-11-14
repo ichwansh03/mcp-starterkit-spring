@@ -1,8 +1,9 @@
 # Google ADK Java Agents
 
 A small collection of [Google ADK](https://github.com/google/adk-java) agents written in Java 21.
-The project demonstrates four building blocks: a minimal function-calling agent, a multi-tool agent
-with structured JSON output, a built-in code-execution agent, and a plain CLI runner.
+The project demonstrates a minimal function-calling agent, a multi-tool agent with structured JSON
+output, a built-in code-execution agent, a plain CLI runner, and two agent-callback examples
+(`beforeAgentCallback` and `afterAgentCallback`).
 
 All agents use Gemini models through the Google AI Studio API key.
 
@@ -82,6 +83,22 @@ to exit.
 
 It is a runner, not an agent: it contains no instructions, tools, or model configuration.
 
+### `BeforeAgentCallbackExample` — CLI demo
+
+A state-driven example of `beforeAgentCallback`. The callback runs before the LLM is called and
+returns `Maybe<Content>`: `Maybe.empty()` lets the agent run normally, while `Maybe.just(Content)`
+skips the model call and uses the returned content as the response. It reads the session state flag
+`skip_llm_agent`, so the same agent either answers normally or short-circuits without spending
+tokens. The demo is CLI-only (no `ROOT_AGENT`).
+
+### `AfterAgentCallbackExample` — CLI demo
+
+A state-driven example of `afterAgentCallback`. The callback runs after the agent responds and
+returns `Maybe<Content>`: `Maybe.empty()` keeps the agent's original output, while
+`Maybe.just(Content)` appends a model-role content event marked as the final turn. It reads the
+session state flag `add_concluding_note`. The demo uses two separate sessions so each scenario
+starts clean. It is CLI-only (no `ROOT_AGENT`).
+
 ## Running the agents
 
 ### Dev UI (all discoverable agents)
@@ -125,6 +142,20 @@ set -a; . ./.env; set +a
 mvn -q compile exec:java -Dexec.mainClass=CodeExecutionAgentApp
 ```
 
+### CLI: before-agent callback demo
+
+```bash
+set -a; . ./.env; set +a
+mvn -q compile exec:java -Dexec.mainClass=callback.BeforeAgentCallbackExample
+```
+
+### CLI: after-agent callback demo
+
+```bash
+set -a; . ./.env; set +a
+mvn -q compile exec:java -Dexec.mainClass=callback.AfterAgentCallbackExample
+```
+
 ## Project layout
 
 ```
@@ -132,6 +163,9 @@ src/main/java/
   AgentCliRunner.java          # CLI harness for HelloTimeAgent
   HelloTimeAgent.java          # minimal single-tool agent
   CodeExecutionAgentApp.java   # built-in code execution agent, exposed to the dev UI
+  callback/
+    BeforeAgentCallbackExample.java  # state-driven pre-LLM guard example
+    AfterAgentCallbackExample.java   # state-driven post-LLM output example
   multitool/
     MultiToolAgent.java        # time + weather tools, structured JSON output
 pom.xml                        # google-adk and google-adk-dev 1.12.0
